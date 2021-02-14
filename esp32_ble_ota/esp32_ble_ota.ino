@@ -123,8 +123,6 @@ class MyCallbacks: public BLECharacteristicCallbacks {
           writeBinary(SPIFFS, "/update.bin", updater, len);
           if (cur < parts - 1) {
             request = true;
-          } else {
-            rebootEspWithReason("Rebooting to start OTA update"); // r
           }
         } else if (pData[0] == 0xFD) {
           SPIFFS.format();
