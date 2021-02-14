@@ -35,8 +35,10 @@
 #define FORMAT_SPIFFS_IF_FAILED true
 
 uint8_t major = 1;
-uint8_t minor = 0;
+uint8_t minor = 2;
 uint8_t ver[] = {0xFA, major, minor};  // code version
+
+uint8_t updater[4096];
 
 #define SERVICE_UUID              "fb1e4001-54ae-4a28-9f74-dfccb248601d"
 #define CHARACTERISTIC_UUID_RX    "fb1e4002-54ae-4a28-9f74-dfccb248601d"
@@ -47,6 +49,12 @@ static BLECharacteristic* pCharacteristicRX;
 
 static bool deviceConnected = false;
 static int id = 0;
+static bool updating = false;
+static bool request = false;
+static int parts = 0;
+static int next = 0;
+static int cur = 0;
+static int MTU = 0;
 
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
@@ -61,14 +69,14 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
 class MyCallbacks: public BLECharacteristicCallbacks {
 
-    void onStatus(BLECharacteristic* pCharacteristic, Status s, uint32_t code) {
-      Serial.print("Status ");
-      Serial.print(s);
-      Serial.print(" on characteristic ");
-      Serial.print(pCharacteristic->getUUID().toString().c_str());
-      Serial.print(" with code ");
-      Serial.println(code);
-    }
+    //    void onStatus(BLECharacteristic* pCharacteristic, Status s, uint32_t code) {
+    //      Serial.print("Status ");
+    //      Serial.print(s);
+    //      Serial.print(" on characteristic ");
+    //      Serial.print(pCharacteristic->getUUID().toString().c_str());
+    //      Serial.print(" with code ");
+    //      Serial.println(code);
+    //    }
 
     void onNotify(BLECharacteristic *pCharacteristic) {
       uint8_t* pData;
@@ -76,10 +84,10 @@ class MyCallbacks: public BLECharacteristicCallbacks {
       int len = value.length();
       pData = pCharacteristic->getData();
       if (pData != NULL) {
-        Serial.print("Notify callback for characteristic ");
-        Serial.print(pCharacteristic->getUUID().toString().c_str());
-        Serial.print(" of data length ");
-        Serial.println(len);
+        //        Serial.print("Notify callback for characteristic ");
+        //        Serial.print(pCharacteristic->getUUID().toString().c_str());
+        //        Serial.print(" of data length ");
+        //        Serial.println(len);
         Serial.print("TX  ");
         for (int i = 0; i < len; i++) {
           Serial.printf("%02X ", pData[i]);
@@ -94,10 +102,10 @@ class MyCallbacks: public BLECharacteristicCallbacks {
       int len = value.length();
       pData = pCharacteristic->getData();
       if (pData != NULL) {
-//        Serial.print("Write callback for characteristic ");
-//        Serial.print(pCharacteristic->getUUID().toString().c_str());
-//        Serial.print(" of data length ");
-//        Serial.println(len);
+        //        Serial.print("Write callback for characteristic ");
+        //        Serial.print(pCharacteristic->getUUID().toString().c_str());
+        //        Serial.print(" of data length ");
+        //        Serial.println(len);
         Serial.print("RX  ");
         for (int i = 0; i < len; i++) {
           Serial.printf("%02X ", pData[i]);
@@ -105,17 +113,29 @@ class MyCallbacks: public BLECharacteristicCallbacks {
         Serial.println();
 
         if (pData[0] == 0xFB) {
-          uint8_t arr[len - 1];
-          for (int x = 0; x < len - 1; x++) {
-            arr[x] = pData[x + 1];
+          int pos = pData[1];
+          for (int x = 0; x < len - 2; x++) {
+            updater[(pos * MTU) + x] = pData[x + 2];
           }
-          writeBinary(SPIFFS, "/update.bin", arr, len - 1);
+        } else if  (pData[0] == 0xFC) {
+          int len = (pData[1] * 256) + pData[2];
+          cur = (pData[3] * 256) + pData[4];
+          writeBinary(SPIFFS, "/update.bin", updater, len);
+          if (cur < parts - 1) {
+            request = true;
+          } else {
+            rebootEspWithReason("Rebooting to start OTA update"); // r
+          }
         } else if (pData[0] == 0xFD) {
           SPIFFS.format();
         } else if  (pData[0] == 0xF0) {
 
         } else if  (pData[0] == 0xFE) {
           rebootEspWithReason("Rebooting to start OTA update");
+        } else if  (pData[0] == 0xFF) {
+          parts = (pData[1] * 256) + pData[2];
+          MTU = (pData[3] * 256) + pData[4];
+          updating = true;
         }
 
 
@@ -187,7 +207,7 @@ void setup() {
     return;
   }
 
-  updateFromFS(SPIFFS); 
+  updateFromFS(SPIFFS);
 
   initBLE();
 
@@ -208,6 +228,22 @@ void loop() {
         delay(100);
       }
       id++;
+    }
+    if (updating) {
+      if (request) {
+        uint8_t rq[] = {0xF1, (cur + 1) / 256, (cur + 1) % 256};
+        pCharacteristicTX->setValue(rq, 3);
+        pCharacteristicTX->notify();
+        delay(100);
+        request = false;
+      }
+      if (cur+1 == parts){
+        uint8_t com[] = {0xF2, (cur + 1) / 256, (cur + 1) % 256};
+        pCharacteristicTX->setValue(com, 3);
+        pCharacteristicTX->notify();
+        delay(100);
+        updating = false;
+      }
     }
   } else {
     digitalWrite(BUILTINLED, LOW);
