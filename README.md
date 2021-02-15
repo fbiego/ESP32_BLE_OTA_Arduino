@@ -11,4 +11,4 @@ OTA update on ESP32 via BLE
 3. Receive first part and write data to `updater` array
 4. Receive end of first part command, append `updater` array to update.bin file
 5. Request the next part (repeats 3, 4 & 5 until all parts have been received)
-6. Receive command to trigger restart ro apply update
+6. Receive command to trigger restart to apply update
