@@ -35,10 +35,10 @@
 #define FORMAT_SPIFFS_IF_FAILED true
 
 uint8_t major = 1;
-uint8_t minor = 2;
+uint8_t minor = 3;
 uint8_t ver[] = {0xFA, major, minor};  // code version
 
-uint8_t updater[4096];
+uint8_t updater[16384]; // >= MainActivity.PART
 
 #define SERVICE_UUID              "fb1e4001-54ae-4a28-9f74-dfccb248601d"
 #define CHARACTERISTIC_UUID_RX    "fb1e4002-54ae-4a28-9f74-dfccb248601d"
@@ -117,6 +117,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
           for (int x = 0; x < len - 2; x++) {
             updater[(pos * MTU) + x] = pData[x + 2];
           }
+          
         } else if  (pData[0] == 0xFC) {
           int len = (pData[1] * 256) + pData[2];
           cur = (pData[3] * 256) + pData[4];
