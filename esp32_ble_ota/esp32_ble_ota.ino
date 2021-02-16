@@ -21,6 +21,7 @@
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE.
 */
+
 #include <Update.h>
 #include "FS.h"
 #include "SPIFFS.h"
@@ -29,13 +30,11 @@
 #include <BLEServer.h>
 #include <BLE2902.h>
 
-
-
 #define BUILTINLED 2
 #define FORMAT_SPIFFS_IF_FAILED true
 
 uint8_t major = 1;
-uint8_t minor = 3;
+uint8_t minor = 4;
 uint8_t ver[] = {0xFA, major, minor};  // code version
 
 uint8_t updater[16384]; // >= MainActivity.PART
@@ -55,6 +54,12 @@ static int parts = 0;
 static int next = 0;
 static int cur = 0;
 static int MTU = 0;
+
+static void rebootEspWithReason(String reason) {
+  Serial.println(reason);
+  delay(1000);
+  ESP.restart();
+}
 
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
@@ -117,7 +122,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
           for (int x = 0; x < len - 2; x++) {
             updater[(pos * MTU) + x] = pData[x + 2];
           }
-          
+
         } else if  (pData[0] == 0xFC) {
           int len = (pData[1] * 256) + pData[2];
           cur = (pData[3] * 256) + pData[4];
@@ -156,17 +161,6 @@ class MyCallbacks: public BLECharacteristicCallbacks {
       file.close();
     }
 
-
-
-    void rebootEspWithReason(String reason) {
-      Serial.println(reason);
-      delay(1000);
-      ESP.restart();
-    }
-
-
-
-
 };
 
 
@@ -198,7 +192,7 @@ void initBLE() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Starting BLE work!");
+  Serial.println("Starting BLE OTA sketch");
   pinMode(BUILTINLED, OUTPUT);
 
   if (!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)) {
@@ -213,9 +207,6 @@ void setup() {
 }
 
 void loop() {
-
-
-
 
   if (deviceConnected) {
     digitalWrite(BUILTINLED, HIGH);
@@ -236,7 +227,7 @@ void loop() {
         delay(100);
         request = false;
       }
-      if (cur+1 == parts){
+      if (cur + 1 == parts) { // received complete file
         uint8_t com[] = {0xF2, (cur + 1) / 256, (cur + 1) % 256};
         pCharacteristicTX->setValue(com, 3);
         pCharacteristicTX->notify();
@@ -265,7 +256,7 @@ void performUpdate(Stream &updateSource, size_t updateSize) {
     if (Update.end()) {
       Serial.println("OTA done!");
       if (Update.isFinished()) {
-        Serial.println("Update successfully completed. Rebooting.");
+        Serial.println("Update successfully completed. Rebooting...");
       }
       else {
         Serial.println("Update not finished? Something went wrong!");
@@ -294,7 +285,7 @@ void updateFromFS(fs::FS &fs) {
     size_t updateSize = updateBin.size();
 
     if (updateSize > 0) {
-      Serial.println("Try to start update");
+      Serial.println("Trying to start update");
       performUpdate(updateBin, updateSize);
     }
     else {
@@ -303,13 +294,13 @@ void updateFromFS(fs::FS &fs) {
 
     updateBin.close();
 
-    // when finished remove the binary from sd card to indicate end of the process
-    fs.remove("/update.bin");
+    // when finished remove the binary from spiffs to indicate end of the process
     Serial.println("Removing update file");
-    delay(1000);
-    ESP.restart();
+    fs.remove("/update.bin");
+
+    rebootEspWithReason("Rebooting to complete OTA update");
   }
   else {
-    Serial.println("Could not load update.bin from sd root");
+    Serial.println("Could not load update.bin from spiffs root");
   }
 }
