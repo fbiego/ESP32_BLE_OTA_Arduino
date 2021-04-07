@@ -4,8 +4,8 @@ OTA update on ESP32 via BLE
 - 1,005,392 bytes uploaded in 5mins 20sec
 - Speed: ~ `3kb/s`
 
-## Android
-[`Android App`](https://github.com/fbiego/ESP32_BLE_OTA_Android)
+## Android app
+[`BLE-OTA-v1.0.apk`](https://github.com/fbiego/ESP32_BLE_OTA_Arduino/raw/main/BLE-OTA-v1.0.apk)
 
 ## Receive Sequence
 1. Receive command to format SPIFFS
