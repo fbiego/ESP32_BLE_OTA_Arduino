@@ -7,6 +7,9 @@ OTA update on ESP32 via BLE
 ## Android app
 [`BLE-OTA-v1.0.apk`](https://github.com/fbiego/ESP32_BLE_OTA_Arduino/raw/main/BLE-OTA-v1.0.apk)
 
+## Video
+[`ESP32 OTA via BLE`](https://youtu.be/j4ELTS7QXFM)
+
 ## Receive Sequence
 1. Receive command to format SPIFFS
 2. Receive number of parts and MTU size
