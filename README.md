@@ -5,7 +5,7 @@ OTA update on ESP32 via BLE
 - Speed: ~ `3kb/s`
 
 ## Android app
-[`BLE-OTA-v1.0.apk`](https://github.com/fbiego/ESP32_BLE_OTA_Arduino/raw/main/BLE-OTA-v1.0.apk)
+[`BLE-OTA-v1.1.apk`](https://github.com/fbiego/ESP32_BLE_OTA_Arduino/raw/main/BLE-OTA-v1.1.apk)
 
 ## Video
 [`ESP32 OTA via BLE`](https://youtu.be/j4ELTS7QXFM)
