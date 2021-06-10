@@ -40,17 +40,15 @@
 
 #ifdef USE_SPIFFS
 #define FLASH SPIFFS
+#define FASTMODE false    //SPIFFS write is slow
 #else
 #define FLASH FFat
+#define FASTMODE true    //FFat is faster
 #endif
 
 #define NORMAL_MODE   0   // normal
 #define UPDATE_MODE   1   // receiving firmware
 #define OTA_MODE      2   // installing firmware
-
-uint8_t major = 1;
-uint8_t minor = 6;
-uint8_t ver[] = {0xFA, major, minor};  // code version
 
 uint8_t updater[16384];
 uint8_t updater2[16384];
@@ -62,16 +60,11 @@ uint8_t updater2[16384];
 static BLECharacteristic* pCharacteristicTX;
 static BLECharacteristic* pCharacteristicRX;
 
-static bool deviceConnected = false;
-static int id = 0;
-static bool writeFile = false;
-static int writeLen = 0;
-static int writeLen2 = 0;
+static bool deviceConnected = false, sendMode = false;
+static bool writeFile = false, request = false;
+static int writeLen = 0, writeLen2 = 0;
 static bool current = true;
-static int parts = 0;
-static int next = 0;
-static int cur = 0;
-static int MTU = 0;
+static int parts = 0, next = 0, cur = 0, MTU = 0;
 static int MODE = NORMAL_MODE;
 
 static void rebootEspWithReason(String reason) {
@@ -87,7 +80,6 @@ class MyServerCallbacks: public BLEServerCallbacks {
     }
     void onDisconnect(BLEServer* pServer) {
       deviceConnected = false;
-      id = 0;
     }
 };
 
@@ -154,15 +146,15 @@ class MyCallbacks: public BLECharacteristicCallbacks {
           }
           current = !current;
           cur = (pData[3] * 256) + pData[4];
-
           writeFile = true;
+          if (cur < parts - 1) {
+            request = !FASTMODE;
+          }
         } else if (pData[0] == 0xFD) {
+          sendMode = true;
           if (FLASH.exists("/update.bin")) {
             FLASH.remove("/update.bin");
           }
-        } else if  (pData[0] == 0xFE) {
-          //rebootEspWithReason("Rebooting to start OTA update");
-
         } else if  (pData[0] == 0xFF) {
           parts = (pData[1] * 256) + pData[2];
           MTU = (pData[3] * 256) + pData[4];
@@ -178,7 +170,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 
 };
 
-void writeBinary(fs::FS &fs, const char * path, uint8_t *dat, int len) {
+static void writeBinary(fs::FS &fs, const char * path, uint8_t *dat, int len) {
 
   //Serial.printf("Write binary file %s\r\n", path);
 
@@ -247,23 +239,32 @@ void loop() {
     case NORMAL_MODE:
       if (deviceConnected) {
         digitalWrite(BUILTINLED, HIGH);
-
-        if (id < 512) {
-          if (id >= 510) {
-            pCharacteristicTX->setValue(ver, 3);
-            pCharacteristicTX->notify();
-            delay(100);
-          }
-          id++;
+        if (sendMode) {
+          uint8_t fMode[] = {0xAA, FASTMODE};
+          pCharacteristicTX->setValue(fMode, 2);
+          pCharacteristicTX->notify();
+          delay(50);
+          sendMode = false;
         }
+
+        // your loop code here 
       } else {
         digitalWrite(BUILTINLED, LOW);
       }
 
+      // or here
 
       break;
 
     case UPDATE_MODE:
+
+      if (request) {
+        uint8_t rq[] = {0xF1, (cur + 1) / 256, (cur + 1) % 256};
+        pCharacteristicTX->setValue(rq, 3);
+        pCharacteristicTX->notify();
+        delay(50);
+        request = false;
+      }
 
       if (cur + 1 == parts) { // received complete file
         uint8_t com[] = {0xF2, (cur + 1) / 256, (cur + 1) % 256};
