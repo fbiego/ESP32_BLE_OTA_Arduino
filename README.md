@@ -7,6 +7,11 @@ OTA update on ESP32 via BLE
 ## Android app
 [`BLE-OTA-v1.4.apk`](https://github.com/fbiego/ESP32_BLE_OTA_Arduino/raw/main/BLE-OTA-v1.4.apk)
 
+## Python Script
+Update from your computer
+
+[`BLE_OTA_Python`](https://github.com/fbiego/BLE_OTA_Python)
+
 ## Video
 [`DIY ESP32 clock with BLE OTA`](https://youtu.be/TU_O4UPm00A) - 12kb/s (optimized)
 
