@@ -1,14 +1,18 @@
 /*
    MIT License
+
    Copyright (c) 2021 Felix Biego
+
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
    in the Software without restriction, including without limitation the rights
    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
    copies of the Software, and to permit persons to whom the Software is
    furnished to do so, subject to the following conditions:
+
    The above copyright notice and this permission notice shall be included in all
    copies or substantial portions of the Software.
+
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -18,23 +22,21 @@
    SOFTWARE.
 */
 
+
 #include <Update.h>
 #include "FS.h"
 #include "FFat.h"
 #include "SPIFFS.h"
-//#include <SD.h>             // For OTA with SD Card
-//#include <BLEDevice.h>
-//#include <BLEUtils.h>
-//#include <BLEServer.h>
-//#include <BLE2902.h>
-
-#include <NimBLEDevice.h>
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEServer.h>
+#include <BLE2902.h>
 
 #define BUILTINLED 2
 #define FORMAT_SPIFFS_IF_FAILED true
 #define FORMAT_FFAT_IF_FAILED true
 
-//#define USE_SPIFFS  //comment to use FFat
+#define USE_SPIFFS  //comment to use FFat
 
 #ifdef USE_SPIFFS
 #define FLASH SPIFFS
@@ -73,12 +75,10 @@ static void rebootEspWithReason(String reason) {
 
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
-      Serial.println("Connected");
       deviceConnected = true;
 
     }
     void onDisconnect(BLEServer* pServer) {
-      Serial.println("disconnected");
       deviceConnected = false;
     }
 };
@@ -94,18 +94,12 @@ class MyCallbacks: public BLECharacteristicCallbacks {
     //      Serial.println(code);
     //    }
 
-    void onRead(BLECharacteristic* pCharacteristic){
-        Serial.print(pCharacteristic->getUUID().toString().c_str());
-        Serial.print(": onRead(), value: ");
-        Serial.println(pCharacteristic->getValue().c_str());
-    };
-
     void onNotify(BLECharacteristic *pCharacteristic) {
-      //uint8_t* pData;
-      std::string pData = pCharacteristic->getValue();
-      int len = pData.length();
-      //pData = pCharacteristic->getData();
-      //if (pData != NULL) {
+      uint8_t* pData;
+      std::string value = pCharacteristic->getValue();
+      int len = value.length();
+      pData = pCharacteristic->getData();
+      if (pData != NULL) {
         //        Serial.print("Notify callback for characteristic ");
         //        Serial.print(pCharacteristic->getUUID().toString().c_str());
         //        Serial.print(" of data length ");
@@ -115,24 +109,24 @@ class MyCallbacks: public BLECharacteristicCallbacks {
           Serial.printf("%02X ", pData[i]);
         }
         Serial.println();
-     // }
+      }
     }
 
     void onWrite(BLECharacteristic *pCharacteristic) {
-      //uint8_t* pData;
-      std::string pData = pCharacteristic->getValue();
-      int len = pData.length();
-      //pData = pCharacteristic->getData();
-      //if (pData != NULL) {
-               // Serial.print("Write callback for characteristic ");
-               // Serial.print(pCharacteristic->getUUID().toString().c_str());
-               // Serial.print(" of data length ");
-               // Serial.println(len);
-               // Serial.print("RX  ");
-               // for (int i = 0; i < len; i++) {         // leave this commented
-               //   Serial.printf("%02X ", pData[i]);
-               // }
-               // Serial.println();
+      uint8_t* pData;
+      std::string value = pCharacteristic->getValue();
+      int len = value.length();
+      pData = pCharacteristic->getData();
+      if (pData != NULL) {
+        //        Serial.print("Write callback for characteristic ");
+        //        Serial.print(pCharacteristic->getUUID().toString().c_str());
+        //        Serial.print(" of data length ");
+        //        Serial.println(len);
+        //        Serial.print("RX  ");
+        //        for (int i = 0; i < len; i++) {         // leave this commented
+        //          Serial.printf("%02X ", pData[i]);
+        //        }
+        //        Serial.println();
 
         if (pData[0] == 0xFB) {
           int pos = pData[1];
@@ -169,7 +163,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
         }
 
 
-      //}
+      }
 
     }
 
@@ -191,40 +185,34 @@ static void writeBinary(fs::FS &fs, const char * path, uint8_t *dat, int len) {
 }
 
 void initBLE() {
-  BLEDevice::init("SBBUA");
-  BLEDevice::setMTU(517);
-  BLEDevice::setPower(ESP_PWR_LVL_P9);
+  BLEDevice::init("ESP32 OTA");
   BLEServer *pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
 
   BLEService *pService = pServer->createService(SERVICE_UUID);
-  pCharacteristicTX = pService->createCharacteristic(CHARACTERISTIC_UUID_TX, NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::READ );
-  pCharacteristicRX = pService->createCharacteristic(CHARACTERISTIC_UUID_RX, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::READ| NIMBLE_PROPERTY::WRITE_NR);
+  pCharacteristicTX = pService->createCharacteristic(CHARACTERISTIC_UUID_TX, BLECharacteristic::PROPERTY_NOTIFY );
+  pCharacteristicRX = pService->createCharacteristic(CHARACTERISTIC_UUID_RX, BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR);
   pCharacteristicRX->setCallbacks(new MyCallbacks());
   pCharacteristicTX->setCallbacks(new MyCallbacks());
-  //pCharacteristicTX->addDescriptor(new BLE2902());
-  //pCharacteristicTX->setNotifyProperty(true);
+  pCharacteristicTX->addDescriptor(new BLE2902());
+  pCharacteristicTX->setNotifyProperty(true);
   pService->start();
-  pServer->start();
+
 
   // BLEAdvertising *pAdvertising = pServer->getAdvertising();  // this still is working for backward compatibility
-  NimBLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
   pAdvertising->setScanResponse(true);
   pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
   pAdvertising->setMinPreferred(0x12);
-  pAdvertising->start();
-  //BLEDevice::startAdvertising();
+  BLEDevice::startAdvertising();
   Serial.println("Characteristic defined! Now you can read it in your phone!");
 }
 
 void setup() {
   Serial.begin(115200);
   Serial.println("Starting BLE OTA sketch");
-  //pinMode(BUILTINLED, OUTPUT);
-
-  //SPI.begin(18, 22, 23, 5);       // For OTA with SD Card
-  //SD.begin(5);                    // For OTA with SD Card
+  pinMode(BUILTINLED, OUTPUT);
 
 #ifdef USE_SPIFFS
   if (!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)) {
@@ -250,7 +238,7 @@ void loop() {
 
     case NORMAL_MODE:
       if (deviceConnected) {
-        //digitalWrite(BUILTINLED, HIGH);
+        digitalWrite(BUILTINLED, HIGH);
         if (sendMode) {
           uint8_t fMode[] = {0xAA, FASTMODE};
           pCharacteristicTX->setValue(fMode, 2);
@@ -261,7 +249,7 @@ void loop() {
 
         // your loop code here 
       } else {
-        //digitalWrite(BUILTINLED, LOW);
+        digitalWrite(BUILTINLED, LOW);
       }
 
       // or here
@@ -298,7 +286,7 @@ void loop() {
       break;
 
     case OTA_MODE:
-        updateFromFS(FLASH);
+      updateFromFS(FLASH);
       break;
 
   }
@@ -375,8 +363,8 @@ void updateFromFS(fs::FS &fs) {
     updateBin.close();
 
     // when finished remove the binary from spiffs to indicate end of the process
-    //Serial.println("Removing update file");
-    //fs.remove("/update.bin");
+    Serial.println("Removing update file");
+    fs.remove("/update.bin");
 
     rebootEspWithReason("Rebooting to complete OTA update");
   }
