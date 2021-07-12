@@ -22,19 +22,14 @@
 #include "FS.h"
 #include "FFat.h"
 #include "SPIFFS.h"
-//#include <SD.h>             // For OTA with SD Card
-//#include <BLEDevice.h>
-//#include <BLEUtils.h>
-//#include <BLEServer.h>
-//#include <BLE2902.h>
-
 #include <NimBLEDevice.h>
+//#include <SD.h>             // For OTA with SD Card
 
 #define BUILTINLED 2
 #define FORMAT_SPIFFS_IF_FAILED true
 #define FORMAT_FFAT_IF_FAILED true
 
-//#define USE_SPIFFS  //comment to use FFat
+#define USE_SPIFFS  //comment to use FFat
 
 #ifdef USE_SPIFFS
 #define FLASH SPIFFS
@@ -94,82 +89,76 @@ class MyCallbacks: public BLECharacteristicCallbacks {
     //      Serial.println(code);
     //    }
 
-    void onRead(BLECharacteristic* pCharacteristic){
-        Serial.print(pCharacteristic->getUUID().toString().c_str());
-        Serial.print(": onRead(), value: ");
-        Serial.println(pCharacteristic->getValue().c_str());
+    void onRead(BLECharacteristic* pCharacteristic) {
+      Serial.print(pCharacteristic->getUUID().toString().c_str());
+      Serial.print(": onRead(), value: ");
+      Serial.println(pCharacteristic->getValue().c_str());
     };
 
     void onNotify(BLECharacteristic *pCharacteristic) {
       //uint8_t* pData;
       std::string pData = pCharacteristic->getValue();
       int len = pData.length();
-      //pData = pCharacteristic->getData();
-      //if (pData != NULL) {
-        //        Serial.print("Notify callback for characteristic ");
-        //        Serial.print(pCharacteristic->getUUID().toString().c_str());
-        //        Serial.print(" of data length ");
-        //        Serial.println(len);
-        Serial.print("TX  ");
-        for (int i = 0; i < len; i++) {
-          Serial.printf("%02X ", pData[i]);
-        }
-        Serial.println();
-     // }
+      //        Serial.print("Notify callback for characteristic ");
+      //        Serial.print(pCharacteristic->getUUID().toString().c_str());
+      //        Serial.print(" of data length ");
+      //        Serial.println(len);
+      Serial.print("TX  ");
+      for (int i = 0; i < len; i++) {
+        Serial.printf("%02X ", pData[i]);
+      }
+      Serial.println();
     }
 
     void onWrite(BLECharacteristic *pCharacteristic) {
       //uint8_t* pData;
       std::string pData = pCharacteristic->getValue();
       int len = pData.length();
-      //pData = pCharacteristic->getData();
-      //if (pData != NULL) {
-               // Serial.print("Write callback for characteristic ");
-               // Serial.print(pCharacteristic->getUUID().toString().c_str());
-               // Serial.print(" of data length ");
-               // Serial.println(len);
-               // Serial.print("RX  ");
-               // for (int i = 0; i < len; i++) {         // leave this commented
-               //   Serial.printf("%02X ", pData[i]);
-               // }
-               // Serial.println();
+      // Serial.print("Write callback for characteristic ");
+      // Serial.print(pCharacteristic->getUUID().toString().c_str());
+      // Serial.print(" of data length ");
+      // Serial.println(len);
+      // Serial.print("RX  ");
+      // for (int i = 0; i < len; i++) {         // leave this commented
+      //   Serial.printf("%02X ", pData[i]);
+      // }
+      // Serial.println();
 
-        if (pData[0] == 0xFB) {
-          int pos = pData[1];
-          for (int x = 0; x < len - 2; x++) {
-            if (current) {
-              updater[(pos * MTU) + x] = pData[x + 2];
-            } else {
-              updater2[(pos * MTU) + x] = pData[x + 2];
-            }
-          }
-
-        } else if  (pData[0] == 0xFC) {
+      if (pData[0] == 0xFB) {
+        int pos = pData[1];
+        for (int x = 0; x < len - 2; x++) {
           if (current) {
-            writeLen = (pData[1] * 256) + pData[2];
+            updater[(pos * MTU) + x] = pData[x + 2];
           } else {
-            writeLen2 = (pData[1] * 256) + pData[2];
+            updater2[(pos * MTU) + x] = pData[x + 2];
           }
-          current = !current;
-          cur = (pData[3] * 256) + pData[4];
-          writeFile = true;
-          if (cur < parts - 1) {
-            request = !FASTMODE;
-          }
-        } else if (pData[0] == 0xFD) {
-          sendMode = true;
-          if (FLASH.exists("/update.bin")) {
-            FLASH.remove("/update.bin");
-          }
-        } else if  (pData[0] == 0xFF) {
-          parts = (pData[1] * 256) + pData[2];
-          MTU = (pData[3] * 256) + pData[4];
-          MODE = UPDATE_MODE;
-
         }
 
+      } else if  (pData[0] == 0xFC) {
+        if (current) {
+          writeLen = (pData[1] * 256) + pData[2];
+        } else {
+          writeLen2 = (pData[1] * 256) + pData[2];
+        }
+        current = !current;
+        cur = (pData[3] * 256) + pData[4];
+        writeFile = true;
+        if (cur < parts - 1) {
+          request = !FASTMODE;
+        }
+      } else if (pData[0] == 0xFD) {
+        sendMode = true;
+        if (FLASH.exists("/update.bin")) {
+          FLASH.remove("/update.bin");
+        }
+      } else if  (pData[0] == 0xFF) {
+        parts = (pData[1] * 256) + pData[2];
+        MTU = (pData[3] * 256) + pData[4];
+        MODE = UPDATE_MODE;
 
-      //}
+      }
+
+
 
     }
 
@@ -191,7 +180,7 @@ static void writeBinary(fs::FS &fs, const char * path, uint8_t *dat, int len) {
 }
 
 void initBLE() {
-  BLEDevice::init("SBBUA");
+  BLEDevice::init("NimBLE OTA");
   BLEDevice::setMTU(517);
   BLEDevice::setPower(ESP_PWR_LVL_P9);
   BLEServer *pServer = BLEDevice::createServer();
@@ -199,11 +188,9 @@ void initBLE() {
 
   BLEService *pService = pServer->createService(SERVICE_UUID);
   pCharacteristicTX = pService->createCharacteristic(CHARACTERISTIC_UUID_TX, NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::READ );
-  pCharacteristicRX = pService->createCharacteristic(CHARACTERISTIC_UUID_RX, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::READ| NIMBLE_PROPERTY::WRITE_NR);
+  pCharacteristicRX = pService->createCharacteristic(CHARACTERISTIC_UUID_RX, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE_NR);
   pCharacteristicRX->setCallbacks(new MyCallbacks());
   pCharacteristicTX->setCallbacks(new MyCallbacks());
-  //pCharacteristicTX->addDescriptor(new BLE2902());
-  //pCharacteristicTX->setNotifyProperty(true);
   pService->start();
   pServer->start();
 
@@ -221,7 +208,7 @@ void initBLE() {
 void setup() {
   Serial.begin(115200);
   Serial.println("Starting BLE OTA sketch");
-  //pinMode(BUILTINLED, OUTPUT);
+  pinMode(BUILTINLED, OUTPUT);
 
   //SPI.begin(18, 22, 23, 5);       // For OTA with SD Card
   //SD.begin(5);                    // For OTA with SD Card
@@ -250,7 +237,7 @@ void loop() {
 
     case NORMAL_MODE:
       if (deviceConnected) {
-        //digitalWrite(BUILTINLED, HIGH);
+        digitalWrite(BUILTINLED, HIGH);
         if (sendMode) {
           uint8_t fMode[] = {0xAA, FASTMODE};
           pCharacteristicTX->setValue(fMode, 2);
@@ -259,9 +246,9 @@ void loop() {
           sendMode = false;
         }
 
-        // your loop code here 
+        // your loop code here
       } else {
-        //digitalWrite(BUILTINLED, LOW);
+        digitalWrite(BUILTINLED, LOW);
       }
 
       // or here
@@ -278,14 +265,6 @@ void loop() {
         request = false;
       }
 
-      if (cur + 1 == parts) { // received complete file
-        uint8_t com[] = {0xF2, (cur + 1) / 256, (cur + 1) % 256};
-        pCharacteristicTX->setValue(com, 3);
-        pCharacteristicTX->notify();
-        delay(50);
-        MODE = OTA_MODE;
-      }
-
       if (writeFile) {
         if (!current) {
           writeBinary(FLASH, "/update.bin", updater, writeLen);
@@ -295,10 +274,18 @@ void loop() {
         writeFile = false;
       }
 
+      if (cur + 1 == parts) { // received complete file
+        uint8_t com[] = {0xF2, (cur + 1) / 256, (cur + 1) % 256};
+        pCharacteristicTX->setValue(com, 3);
+        pCharacteristicTX->notify();
+        delay(50);
+        MODE = OTA_MODE;
+      }
+
       break;
 
     case OTA_MODE:
-        updateFromFS(FLASH);
+      updateFromFS(FLASH);
       break;
 
   }
@@ -306,7 +293,9 @@ void loop() {
 }
 
 void sendOtaResult(String result) {
-  pCharacteristicTX->setValue(result.c_str());
+  byte arr[result.length()];
+  result.getBytes(arr, result.length());
+  pCharacteristicTX->setValue(arr, result.length());
   pCharacteristicTX->notify();
   delay(200);
 }
@@ -375,8 +364,8 @@ void updateFromFS(fs::FS &fs) {
     updateBin.close();
 
     // when finished remove the binary from spiffs to indicate end of the process
-    //Serial.println("Removing update file");
-    //fs.remove("/update.bin");
+    Serial.println("Removing update file");
+    fs.remove("/update.bin");
 
     rebootEspWithReason("Rebooting to complete OTA update");
   }

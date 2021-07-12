@@ -4,6 +4,11 @@ OTA update on ESP32 via BLE
 - 1,038,544 bytes uploaded in 1min 25sec
 - Speed: ~ `12kb/s`
 
+[`esp32_ble_ota`](https://github.com/fbiego/ESP32_BLE_OTA_Arduino/tree/main/esp32_ble_ota) - 1,008,199 bytes
+
+[`esp32_nim_ble_ota`](https://github.com/fbiego/ESP32_BLE_OTA_Arduino/tree/main/esp32_nim_ble_ota) - 563,051 bytes
+
+
 ## Android app
 [`BLE-OTA-v1.4.apk`](https://github.com/fbiego/ESP32_BLE_OTA_Arduino/raw/main/BLE-OTA-v1.4.apk)
 
