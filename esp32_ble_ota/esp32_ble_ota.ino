@@ -184,6 +184,86 @@ static void writeBinary(fs::FS &fs, const char * path, uint8_t *dat, int len) {
   file.close();
 }
 
+void sendOtaResult(String result) {
+  pCharacteristicTX->setValue(result.c_str());
+  pCharacteristicTX->notify();
+  delay(200);
+}
+
+
+void performUpdate(Stream &updateSource, size_t updateSize) {
+  char s1 = 0x0F;
+  String result = String(s1);
+  if (Update.begin(updateSize)) {
+    size_t written = Update.writeStream(updateSource);
+    if (written == updateSize) {
+      Serial.println("Written : " + String(written) + " successfully");
+    }
+    else {
+      Serial.println("Written only : " + String(written) + "/" + String(updateSize) + ". Retry?");
+    }
+    result += "Written : " + String(written) + "/" + String(updateSize) + " [" + String((written / updateSize) * 100) + "%] \n";
+    if (Update.end()) {
+      Serial.println("OTA done!");
+      result += "OTA Done: ";
+      if (Update.isFinished()) {
+        Serial.println("Update successfully completed. Rebooting...");
+        result += "Success!\n";
+      }
+      else {
+        Serial.println("Update not finished? Something went wrong!");
+        result += "Failed!\n";
+      }
+
+    }
+    else {
+      Serial.println("Error Occurred. Error #: " + String(Update.getError()));
+      result += "Error #: " + String(Update.getError());
+    }
+  }
+  else
+  {
+    Serial.println("Not enough space to begin OTA");
+    result += "Not enough space for OTA";
+  }
+  if (deviceConnected) {
+    sendOtaResult(result);
+    delay(5000);
+  }
+}
+
+void updateFromFS(fs::FS &fs) {
+  File updateBin = fs.open("/update.bin");
+  if (updateBin) {
+    if (updateBin.isDirectory()) {
+      Serial.println("Error, update.bin is not a file");
+      updateBin.close();
+      return;
+    }
+
+    size_t updateSize = updateBin.size();
+
+    if (updateSize > 0) {
+      Serial.println("Trying to start update");
+      performUpdate(updateBin, updateSize);
+    }
+    else {
+      Serial.println("Error, file is empty");
+    }
+
+    updateBin.close();
+
+    // when finished remove the binary from spiffs to indicate end of the process
+    Serial.println("Removing update file");
+    fs.remove("/update.bin");
+
+    rebootEspWithReason("Rebooting to complete OTA update");
+  }
+  else {
+    Serial.println("Could not load update.bin from spiffs root");
+  }
+}
+
 void initBLE() {
   BLEDevice::init("ESP32 OTA");
   BLEServer *pServer = BLEDevice::createServer();
@@ -291,84 +371,4 @@ void loop() {
 
   }
 
-}
-
-void sendOtaResult(String result) {
-  pCharacteristicTX->setValue(result.c_str());
-  pCharacteristicTX->notify();
-  delay(200);
-}
-
-
-void performUpdate(Stream &updateSource, size_t updateSize) {
-  char s1 = 0x0F;
-  String result = String(s1);
-  if (Update.begin(updateSize)) {
-    size_t written = Update.writeStream(updateSource);
-    if (written == updateSize) {
-      Serial.println("Written : " + String(written) + " successfully");
-    }
-    else {
-      Serial.println("Written only : " + String(written) + "/" + String(updateSize) + ". Retry?");
-    }
-    result += "Written : " + String(written) + "/" + String(updateSize) + " [" + String((written / updateSize) * 100) + "%] \n";
-    if (Update.end()) {
-      Serial.println("OTA done!");
-      result += "OTA Done: ";
-      if (Update.isFinished()) {
-        Serial.println("Update successfully completed. Rebooting...");
-        result += "Success!\n";
-      }
-      else {
-        Serial.println("Update not finished? Something went wrong!");
-        result += "Failed!\n";
-      }
-
-    }
-    else {
-      Serial.println("Error Occurred. Error #: " + String(Update.getError()));
-      result += "Error #: " + String(Update.getError());
-    }
-  }
-  else
-  {
-    Serial.println("Not enough space to begin OTA");
-    result += "Not enough space for OTA";
-  }
-  if (deviceConnected) {
-    sendOtaResult(result);
-    delay(5000);
-  }
-}
-
-void updateFromFS(fs::FS &fs) {
-  File updateBin = fs.open("/update.bin");
-  if (updateBin) {
-    if (updateBin.isDirectory()) {
-      Serial.println("Error, update.bin is not a file");
-      updateBin.close();
-      return;
-    }
-
-    size_t updateSize = updateBin.size();
-
-    if (updateSize > 0) {
-      Serial.println("Trying to start update");
-      performUpdate(updateBin, updateSize);
-    }
-    else {
-      Serial.println("Error, file is empty");
-    }
-
-    updateBin.close();
-
-    // when finished remove the binary from spiffs to indicate end of the process
-    Serial.println("Removing update file");
-    fs.remove("/update.bin");
-
-    rebootEspWithReason("Rebooting to complete OTA update");
-  }
-  else {
-    Serial.println("Could not load update.bin from spiffs root");
-  }
 }
