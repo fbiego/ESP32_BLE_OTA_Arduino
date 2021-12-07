@@ -66,6 +66,7 @@ static int writeLen = 0, writeLen2 = 0;
 static bool current = true;
 static int parts = 0, next = 0, cur = 0, MTU = 0;
 static int MODE = NORMAL_MODE;
+unsigned long rParts, tParts;
 
 static void rebootEspWithReason(String reason) {
   Serial.println(reason);
@@ -155,6 +156,15 @@ class MyCallbacks: public BLECharacteristicCallbacks {
           if (FLASH.exists("/update.bin")) {
             FLASH.remove("/update.bin");
           }
+        } else if (pData[0] == 0xFE) {
+          rParts = 0;
+          tParts = (pData[1] * 256 * 256 * 256) + (pData[2] * 256 * 256) + (pData[3] * 256) + pData[4];
+
+          Serial.print("Available space: ");
+          Serial.println(FLASH.totalBytes() - FLASH.usedBytes());
+          Serial.print("File Size: ");
+          Serial.println(tParts);
+
         } else if  (pData[0] == 0xFF) {
           parts = (pData[1] * 256) + pData[2];
           MTU = (pData[3] * 256) + pData[4];
@@ -182,6 +192,8 @@ static void writeBinary(fs::FS &fs, const char * path, uint8_t *dat, int len) {
   }
   file.write(dat, len);
   file.close();
+  writeFile = false;
+  rParts += len;
 }
 
 void sendOtaResult(String result) {
@@ -327,7 +339,7 @@ void loop() {
           sendMode = false;
         }
 
-        // your loop code here 
+        // your loop code here
       } else {
         digitalWrite(BUILTINLED, LOW);
       }
@@ -360,13 +372,30 @@ void loop() {
         } else {
           writeBinary(FLASH, "/update.bin", updater2, writeLen2);
         }
-        writeFile = false;
       }
 
       break;
 
     case OTA_MODE:
-      updateFromFS(FLASH);
+
+      if (writeFile) {
+        if (!current) {
+          writeBinary(FLASH, "/update.bin", updater, writeLen);
+        } else {
+          writeBinary(FLASH, "/update.bin", updater2, writeLen2);
+        }
+      }
+
+
+      if (rParts == tParts) {
+        Serial.println("Complete");
+        delay(5000);
+        updateFromFS(FLASH);
+      } else {
+        writeFile = true;
+        Serial.println("Incomplete");
+        delay(2000);
+      }
       break;
 
   }
