@@ -53,7 +53,7 @@ uint8_t updater2[16384];
 static BLECharacteristic* pCharacteristicTX;
 static BLECharacteristic* pCharacteristicRX;
 
-static bool deviceConnected = false, sendMode = false;
+static bool deviceConnected = false, sendMode = false, sendSize = true;
 static bool writeFile = false, request = false;
 static int writeLen = 0, writeLen2 = 0;
 static bool current = true;
@@ -153,19 +153,22 @@ class MyCallbacks: public BLECharacteristicCallbacks {
           FLASH.remove("/update.bin");
         }
       } else if (pData[0] == 0xFE) {
-          rParts = 0;
-          tParts = (pData[1] * 256 * 256 * 256) + (pData[2] * 256 * 256) + (pData[3] * 256) + pData[4];
+        rParts = 0;
+        tParts = (pData[1] * 256 * 256 * 256) + (pData[2] * 256 * 256) + (pData[3] * 256) + pData[4];
 
-          Serial.print("Available space: ");
-          Serial.println(FLASH.totalBytes() - FLASH.usedBytes());
-          Serial.print("File Size: ");
-          Serial.println(tParts);
+        Serial.print("Available space: ");
+        Serial.println(FLASH.totalBytes() - FLASH.usedBytes());
+        Serial.print("File Size: ");
+        Serial.println(tParts);
 
-        } else if  (pData[0] == 0xFF) {
+      } else if  (pData[0] == 0xFF) {
         parts = (pData[1] * 256) + pData[2];
         MTU = (pData[3] * 256) + pData[4];
         MODE = UPDATE_MODE;
 
+      } else if (pData[0] == 0xEF) {
+        FLASH.format();
+        sendSize = true;
       }
 
 
@@ -339,6 +342,15 @@ void loop() {
           delay(50);
           sendMode = false;
         }
+        if (sendSize) {
+          unsigned long x = FLASH.totalBytes();
+          unsigned long y = FLASH.usedBytes();
+          uint8_t fSize[] = {0xEF, (uint8_t) (x >> 16), (uint8_t) (x >> 8), (uint8_t) x, (uint8_t) (y >> 16), (uint8_t) (y >> 8), (uint8_t) y};
+          pCharacteristicTX->setValue(fSize, 7);
+          pCharacteristicTX->notify();
+          delay(50);
+          sendSize = false;
+        }
 
         // your loop code here
       } else {
@@ -395,6 +407,10 @@ void loop() {
       } else {
         writeFile = true;
         Serial.println("Incomplete");
+        Serial.print("Expected: ");
+        Serial.print(tParts);
+        Serial.print("Received: ");
+        Serial.println(rParts);
         delay(2000);
       }
       break;
