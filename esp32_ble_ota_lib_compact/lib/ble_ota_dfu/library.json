@@ -1,0 +1,14 @@
+{
+  "name": "ble_ota_dfuU",
+  "keywords": "BLE OTA DFU",
+  "description": "BLE OTA DFU",
+  "repository":
+  {
+    "type": "email",
+    "url": "vincent.stragier@outlook.com"
+  },
+  "version": "1.0.0",
+  "exclude": "doc",
+  "frameworks": "arduino",
+  "platforms": ["esp32"]
+}
